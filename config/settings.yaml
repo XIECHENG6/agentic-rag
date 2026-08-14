@@ -1,0 +1,36 @@
+llm:
+  api_base: https://api.deepseek.com/v1
+  model: deepseek-chat
+  temperature: 0.0
+  max_tokens: 2048
+
+embedding:
+  model: BAAI/bge-small-zh-v1.5
+  dimension: 512
+  query_prefix_zh: "为这个句子生成表示以用于检索相关文章："
+  query_prefix_en: "Represent this sentence for searching relevant passages: "
+
+chunking:
+  strategy: recursive
+  chunk_size: 512
+  chunk_overlap: 64
+
+retrieval:
+  vector_top_k: 5
+  graph_hops: 2
+  fusion_method: rrf
+  rrf_k: 60
+
+agent:
+  max_steps: 12
+  max_reformulations: 2
+  reflection_threshold: 0.6
+  max_sub_problems: 4
+
+evaluation:
+  benchmark_path: data/benchmark.json
+  metrics:
+    - rouge_l
+    - exact_match
+    - f1
+    - faithfulness

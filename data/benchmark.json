@@ -1,0 +1,792 @@
+[
+  {
+    "question": "QLoRA中使用什么量化方法来减少显存占用？",
+    "answer": "QLoRA使用NF4（Normal Float 4）量化方法，将预训练模型的权重量化为4位，大幅减少显存占用。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "qlora_intro.md"
+    ]
+  },
+  {
+    "question": "ReAct框架中的三个核心步骤是什么？",
+    "answer": "ReAct框架的三个核心步骤是Thought（思考）、Action（行动）和Observation（观察），三者构成循环推理链。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "react_agent.md"
+    ]
+  },
+  {
+    "question": "RAG系统中常用的向量检索库是什么？",
+    "answer": "RAG系统中常用的向量检索库是FAISS（Facebook AI Similarity Search），由Meta开发，支持高效的近似最近邻搜索。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "rag_overview.md"
+    ]
+  },
+  {
+    "question": "Qwen2.5系列模型主要面向什么场景？",
+    "answer": "Qwen2.5系列模型主要面向小语言模型应用场景，提供多种参数规模（如0.5B、1.5B、3B、7B等），适用于资源受限的部署环境和端侧推理。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "small_lm_trends.md"
+    ]
+  },
+  {
+    "question": "QLoRA中的双重量化（Double Quantization）技术是什么？",
+    "answer": "双重量化是对量化常数本身再进行一次量化的技术，将NF4量化的缩放因子从FP32进一步量化为8位，每个参数额外节省约0.37位显存。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "qlora_intro.md"
+    ]
+  },
+  {
+    "question": "ReAct Agent中Function Calling的作用是什么？",
+    "answer": "Function Calling允许Agent根据推理结果调用外部工具或API，将模型的思考转化为具体操作，实现与真实世界的交互。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "react_agent.md"
+    ]
+  },
+  {
+    "question": "RAG中文档分块（Chunking）的常见策略有哪些？",
+    "answer": "常见分块策略包括固定长度分块、按段落分块、按语义分块和递归分块。通常设置chunk_size和chunk_overlap参数来控制分块大小和重叠区域。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "rag_overview.md"
+    ]
+  },
+  {
+    "question": "微调（Fine-tuning）和蒸馏（Distillation）有什么区别？",
+    "answer": "微调是在预训练模型基础上继续训练以适应特定任务，蒸馏则是将大模型的知识迁移到小模型中，让小模型学习大模型的输出分布或中间表示。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "small_lm_trends.md"
+    ]
+  },
+  {
+    "question": "QLoRA中LoRA的rank和alpha参数分别控制什么？",
+    "answer": "rank控制低秩分解矩阵的维度，决定可训练参数量；alpha是缩放因子，用于调节LoRA更新的强度，通常设置为rank的2倍。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "qlora_intro.md"
+    ]
+  },
+  {
+    "question": "什么是LLM的幻觉问题（Hallucination）？",
+    "answer": "幻觉问题指大语言模型生成看似合理但实际不正确或无事实依据的内容，是LLM面临的核心挑战之一。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "react_agent.md"
+    ]
+  },
+  {
+    "question": "RAG系统评估中ROUGE-L指标衡量什么？",
+    "answer": "ROUGE-L通过计算生成文本与参考答案之间的最长公共子序列（LCS）来衡量生成质量，反映答案的完整性和流畅度。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "rag_overview.md"
+    ]
+  },
+  {
+    "question": "BGE嵌入模型是什么？",
+    "answer": "BGE（BAAI General Embedding）是由智源研究院开发的中文嵌入模型，在中文语义检索和文本相似度任务中表现优异，常用于RAG系统的向量化环节。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "small_lm_trends.md"
+    ]
+  },
+  {
+    "question": "QLoRA中的Paged Optimizer是什么？",
+    "answer": "Paged Optimizer是QLoRA的显存管理机制，由bitsandbytes库实现。当GPU显存不足以容纳完整的模型参数、梯度和优化器状态时，自动将部分优化器状态分页转移到CPU内存，并在参数更新时按需加载回GPU，避免OOM错误。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "qlora_intro.md"
+    ]
+  },
+  {
+    "question": "ReAct Agent在多步推理中如何维持上下文？",
+    "answer": "ReAct Agent通过维护完整的Thought-Action-Observation历史记录作为上下文，每一步的推理和观察结果都追加到prompt中，供后续步骤参考。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "react_agent.md"
+    ]
+  },
+  {
+    "question": "RAG中Top-K检索和MMR检索的核心区别是什么？",
+    "answer": "Top-K检索返回与查询最相似的K个文档，MMR（最大边际相关性）在考虑相关性的同时引入多样性惩罚，避免返回高度重复的文档。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "rag_overview.md"
+    ]
+  },
+  {
+    "question": "Qwen2.5系列中适合端侧部署的模型规模有哪些？",
+    "answer": "Qwen2.5系列中0.5B和1.5B参数的模型适合端侧部署，可在手机、嵌入式设备等资源受限环境中运行。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "small_lm_trends.md"
+    ]
+  },
+  {
+    "question": "QLoRA相比传统LoRA的主要优势是什么？",
+    "answer": "QLoRA在LoRA基础上引入4-bit量化，将基础模型量化为NF4格式，使得在单张消费级GPU上微调65B参数模型成为可能，显存需求降低约75%。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "qlora_intro.md"
+    ]
+  },
+  {
+    "question": "Function Calling如何解决LLM的幻觉问题？",
+    "answer": "Function Calling让模型调用外部工具获取实时、准确的数据，而不是依赖模型内部参数生成答案，从而减少事实性幻觉。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "react_agent.md"
+    ]
+  },
+  {
+    "question": "RAG系统中Faithfulness指标评估什么？",
+    "answer": "Faithfulness评估生成的答案是否忠实于检索到的上下文，即答案中的每个声明是否都能在检索文档中找到依据，防止生成超出检索范围的内容。",
+    "type": "simple",
+    "difficulty": "medium",
+    "hops": 1,
+    "source_docs": [
+      "rag_overview.md"
+    ]
+  },
+  {
+    "question": "小语言模型为什么越来越受关注？",
+    "answer": "小语言模型因部署成本低、推理速度快、可端侧运行等优势，在隐私敏感和资源受限场景下比大模型更具实用性，同时通过微调和蒸馏技术不断缩小与大模型的性能差距。",
+    "type": "simple",
+    "difficulty": "easy",
+    "hops": 1,
+    "source_docs": [
+      "small_lm_trends.md"
+    ]
+  },
+  {
+    "question": "QLoRA的双重量化技术节省了多少显存？这个技术和NF4量化是什么关系？",
+    "answer": "双重量化每个参数额外节省约0.37位显存。它与NF4量化是叠加关系：NF4先将权重从FP16量化为4位，双重量化再对NF4的缩放因子进行二次量化，两者共同作用进一步压缩显存。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "QLoRA的双重量化技术节省了多少显存？",
+      "双重量化和NF4量化之间是什么关系？"
+    ]
+  },
+  {
+    "question": "QLoRA的4-bit训练流程中，Paged Optimizer在什么情况下触发？它对训练效果有影响吗？",
+    "answer": "Paged Optimizer在GPU显存不足以容纳优化器状态时自动触发，将部分优化器状态分页卸载到CPU内存。它是一种显存管理策略，不影响训练效果，只影响训练速度。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "Paged Optimizer在什么条件下触发？",
+      "Paged Optimizer对训练效果是否有影响？"
+    ]
+  },
+  {
+    "question": "QLoRA中设置rank=64、alpha=128的配置意味着什么？这种配置下可训练参数占总参数的比例大概是多少？",
+    "answer": "rank=64表示LoRA分解矩阵维度为64，alpha=128是缩放因子，缩放比例为alpha/rank=2。这种配置下可训练参数通常只占总参数的0.1%-1%左右，大幅降低训练成本。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 2,
+    "source_docs": [
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "rank=64和alpha=128的配置含义是什么？",
+      "这种配置下可训练参数占比是多少？"
+    ]
+  },
+  {
+    "question": "ReAct Agent的Thought-Action-Observation循环如何处理工具调用失败的情况？",
+    "answer": "当工具调用失败时，Observation会返回错误信息，Agent在下一轮Thought中分析失败原因，然后调整Action策略重新尝试或选择替代方案，体现自我纠错能力。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "ReAct循环中Observation如何反馈工具调用失败？",
+      "Agent收到失败反馈后如何调整策略？"
+    ]
+  },
+  {
+    "question": "ReAct Agent在多步推理中如何避免陷入无限循环？",
+    "answer": "通常通过设置最大迭代次数（max_iterations）限制循环轮数，同时在prompt中引导Agent识别何时已获得足够信息可以给出最终答案，避免重复执行相同操作。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "ReAct Agent用什么机制防止无限循环？",
+      "如何在prompt层面引导Agent适时终止推理？"
+    ]
+  },
+  {
+    "question": "ReAct框架中Function Calling如何与Thought步骤配合完成复杂任务？",
+    "answer": "Thought步骤分析问题并制定调用计划，Function Calling执行具体的工具操作获取数据，Observation将结果反馈给Thought进行下一步规划，三者配合实现分步解决复杂任务。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "Thought步骤如何制定工具调用计划？",
+      "Function Calling和Observation如何配合Thought完成推理？"
+    ]
+  },
+  {
+    "question": "RAG系统中分块大小（chunk_size）如何影响检索效果？",
+    "answer": "chunk_size过大会导致分块包含过多无关信息，降低检索精度；过小则丢失上下文语义。通常需要配合chunk_overlap使用，在保留语义完整性和检索精确度之间取得平衡。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "chunk_size过大对检索效果有什么影响？",
+      "chunk_size过小对检索效果有什么影响？"
+    ]
+  },
+  {
+    "question": "RAG中使用FAISS进行向量检索时，如何选择索引类型以平衡速度和精度？",
+    "answer": "FAISS提供多种索引类型：IndexFlatIP内积精确搜索精度最高但时间复杂度O(N×d)，适合小规模数据；IndexIVF倒排索引通过K-means聚类划分搜索空间，用nprobe参数在精度与速度间权衡，适合百万级数据；IndexIVFPQ结合倒排索引和乘积量化压缩，是超大规模数据集的推荐选择。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 2,
+    "source_docs": [
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "FAISS有哪些常见的索引类型？",
+      "不同索引类型如何平衡检索速度和精度？"
+    ]
+  },
+  {
+    "question": "RAG系统中评估Faithfulness和ROUGE-L指标时，两者的侧重点有什么不同？",
+    "answer": "Faithfulness关注答案是否忠实于检索到的上下文，防止捏造信息；ROUGE-L关注答案与参考答案的表面文本匹配度，衡量答案的完整性和表达质量。两者互补使用可全面评估RAG质量。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "Faithfulness指标的评估侧重点是什么？",
+      "ROUGE-L指标的评估侧重点是什么？"
+    ]
+  },
+  {
+    "question": "Qwen2.5系列中，微调小模型和蒸馏大模型相比，哪种方式更适合资源受限场景？",
+    "answer": "微调小模型更适合资源受限场景，因为微调所需训练数据量和计算资源较少，直接在已有小模型上针对特定任务训练即可；蒸馏需要同时运行大模型和小模型，计算开销更大。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md"
+    ],
+    "decomposition": [
+      "微调小模型在资源受限场景下的优势是什么？",
+      "蒸馏在资源受限场景下的局限性是什么？"
+    ]
+  },
+  {
+    "question": "BGE嵌入模型在RAG系统中如何与FAISS配合使用？",
+    "answer": "BGE模型将文本转换为高质量的语义向量表示，FAISS接收这些向量建立索引并执行高效的近似最近邻搜索。BGE负责语义编码质量，FAISS负责检索速度。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "BGE嵌入模型在RAG中的角色是什么？",
+      "FAISS如何利用BGE生成的向量进行检索？"
+    ]
+  },
+  {
+    "question": "QLoRA的4-bit量化训练和ReAct Agent中的Function Calling，哪个更适合在消费级GPU上部署？",
+    "answer": "两者可分别部署：QLoRA利用4-bit量化降低微调时的显存需求，适合在消费级GPU上训练；ReAct Agent的Function Calling是推理阶段的工具调用，显存需求取决于底层LLM大小。QLoRA训练的模型可作为Agent的底层LLM使用。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "qlora_intro.md",
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "QLoRA 4-bit训练对消费级GPU的显存要求是什么？",
+      "ReAct Agent中Function Calling的部署需要什么条件？",
+      "两者如何在消费级GPU上协同使用？"
+    ]
+  },
+  {
+    "question": "QLoRA微调后的模型如何应用到RAG系统中？微调对RAG的检索和生成环节分别有什么影响？",
+    "answer": "QLoRA微调后的模型主要提升RAG的生成环节，使生成器更好地适应特定领域或任务。微调对检索环节无直接影响，检索质量主要取决于嵌入模型和向量索引。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "qlora_intro.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "QLoRA微调后的模型在RAG中扮演什么角色？",
+      "微调对RAG生成环节有什么影响？",
+      "微调对RAG检索环节有什么影响？"
+    ]
+  },
+  {
+    "question": "ReAct Agent如何利用RAG技术来减少幻觉问题？",
+    "answer": "ReAct Agent通过Function Calling调用RAG检索工具获取相关文档作为上下文依据，在Observation中验证检索结果的准确性，然后基于可靠上下文生成答案，从而减少凭空捏造的幻觉。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "react_agent.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "ReAct Agent如何通过Function Calling调用RAG？",
+      "RAG检索的上下文如何帮助减少Agent幻觉？"
+    ]
+  },
+  {
+    "question": "用QLoRA微调Qwen2.5小模型做RAG生成器，和直接用大模型做RAG生成器相比有什么优劣？",
+    "answer": "QLoRA微调Qwen2.5小模型部署成本低、推理快，适合特定领域；但泛化能力和复杂推理能力弱于大模型。大模型生成质量更高但部署成本高、推理延迟大。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "qlora_intro.md",
+      "small_lm_trends.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "QLoRA微调Qwen2.5小模型做RAG生成器的优势是什么？",
+      "大模型做RAG生成器的优势是什么？",
+      "两者在部署成本上的差异如何？"
+    ]
+  },
+  {
+    "question": "小语言模型蒸馏技术和QLoRA微调技术，哪种更适合快速适配新领域任务？",
+    "answer": "QLoRA微调更适合快速适配新领域，只需少量领域数据和低计算成本即可训练；蒸馏需要运行完整的大模型进行知识迁移，训练周期更长、计算开销更大，但可能获得更好的泛化效果。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md",
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "QLoRA微调在快速适配新任务方面的优势是什么？",
+      "蒸馏技术在适配新任务时的局限性是什么？"
+    ]
+  },
+  {
+    "question": "ReAct Agent中的多步推理和RAG中的多路召回（MMR）有什么共同的设计理念？",
+    "answer": "两者都追求信息的多样性和互补性：ReAct的多步推理通过多次工具调用从不同角度收集信息，MMR通过多样性惩罚检索不同方面的文档。共同目标是获取更全面的上下文以提升最终答案质量。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "react_agent.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "ReAct多步推理的设计理念是什么？",
+      "RAG中MMR检索的设计理念是什么？",
+      "两者的共同设计目标是什么？"
+    ]
+  },
+  {
+    "question": "RAG系统中chunk_overlap参数的作用是什么？设置不当会如何影响整体检索质量？",
+    "answer": "chunk_overlap设置相邻分块之间的重叠区域，确保跨块边界的语义信息不会丢失。overlap过小可能导致关键上下文被截断，overlap过大则会产生大量冗余分块，增加存储和计算开销，同时降低检索精度。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "chunk_overlap参数的作用是什么？",
+      "chunk_overlap设置不当对检索质量有什么影响？"
+    ]
+  },
+  {
+    "question": "ReAct Agent在执行多步推理时如何利用Function Calling检测和纠正自身幻觉？",
+    "answer": "Agent可以在Thought步骤中主动规划验证步骤，通过Function Calling调用知识库检索工具或事实核查API来验证之前的推理结论，在Observation中对比验证结果，发现不一致时修正之前的推理方向。",
+    "type": "bridge",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "ReAct Agent如何在Thought中规划验证步骤？",
+      "Function Calling如何调用验证工具？",
+      "Observation如何利用验证结果纠正幻觉？"
+    ]
+  },
+  {
+    "question": "蒸馏技术如何帮助Qwen2.5小模型获得接近大模型的能力？蒸馏后还需要微调吗？",
+    "answer": "蒸馏通过让小模型学习大模型的输出分布和中间表示，将大模型的通用知识迁移到小模型中。蒸馏后通常仍需要针对特定任务进行微调，以进一步提升小模型在具体应用场景中的表现。",
+    "type": "bridge",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md"
+    ],
+    "decomposition": [
+      "蒸馏技术如何让小模型获得大模型的能力？",
+      "蒸馏后是否还需要微调？"
+    ]
+  },
+  {
+    "question": "对比QLoRA中的NF4量化和INT8量化的优缺点",
+    "answer": "NF4将权重量化为4位，显存节省更多但精度损失较大，适合大模型微调场景；INT8量化为8位，精度损失小但显存节省较少。NF4在信息论上接近最优的4位量化方案。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "NF4量化的优缺点是什么？",
+      "INT8量化的优缺点是什么？"
+    ]
+  },
+  {
+    "question": "对比QLoRA的双重量化和Paged Optimizer两种显存优化技术的原理",
+    "answer": "双重量化通过压缩量化常数减少模型存储，是静态的内存节省；Paged Optimizer通过动态卸载优化器状态到CPU内存来避免OOM，是动态的内存管理。两者可同时使用，分别从模型存储和训练状态两个维度优化显存。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "双重量化的显存优化原理是什么？",
+      "Paged Optimizer的显存优化原理是什么？"
+    ]
+  },
+  {
+    "question": "对比ReAct Agent和传统Chain-of-Thought推理的区别",
+    "answer": "ReAct在思维链基础上增加了Action和Observation步骤，能与外部工具交互获取实时信息；传统CoT仅依赖模型内部知识进行纯文本推理。ReAct更适合需要外部数据的复杂任务，但推理延迟更高。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "ReAct Agent的推理机制是什么？",
+      "传统Chain-of-Thought推理的机制是什么？"
+    ]
+  },
+  {
+    "question": "对比ReAct中Function Calling和RAG中向量检索获取信息的不同方式",
+    "answer": "Function Calling通过结构化API调用获取精确数据，适合查询结构化信息；RAG向量检索通过语义相似度匹配从文档库中获取相关段落，适合非结构化知识检索。两者可互补使用。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "react_agent.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "Function Calling获取信息的方式是什么？",
+      "RAG向量检索获取信息的方式是什么？"
+    ]
+  },
+  {
+    "question": "对比RAG中Top-K检索和MMR检索的优缺点",
+    "answer": "Top-K检索简单高效，返回最相关的K个文档，但可能返回高度重复的内容；MMR在相关性和多样性之间权衡，避免冗余但可能遗漏最相关的文档。实际应用中MMR更适合需要多角度信息的场景。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "Top-K检索的优缺点是什么？",
+      "MMR检索的优缺点是什么？"
+    ]
+  },
+  {
+    "question": "对比RAG系统评估中ROUGE-L和Faithfulness指标的适用场景",
+    "answer": "ROUGE-L适用于有标准参考答案的场景，衡量生成文本与参考答案的匹配度；Faithfulness适用于无标准答案但需确保答案基于检索内容的场景，衡量答案的可靠性和忠实度。两者互补使用可全面评估RAG质量。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "ROUGE-L指标适用于什么场景？",
+      "Faithfulness指标适用于什么场景？"
+    ]
+  },
+  {
+    "question": "对比Qwen2.5系列模型和BGE嵌入模型在NLP任务中的不同角色",
+    "answer": "Qwen2.5是生成式语言模型，负责文本生成、推理和对话；BGE是表示模型，负责将文本转换为语义向量用于检索和相似度计算。两者在RAG系统中分别承担生成和检索的角色。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md"
+    ],
+    "decomposition": [
+      "Qwen2.5系列模型在NLP任务中的角色是什么？",
+      "BGE嵌入模型在NLP任务中的角色是什么？"
+    ]
+  },
+  {
+    "question": "对比小模型微调和蒸馏两种技术在训练数据需求上的差异",
+    "answer": "微调通常需要较少的领域特定数据（数百到数千条），直接在小模型上调整参数；蒸馏需要大量数据来传递大模型知识，且需要同时运行大模型和小模型，计算成本更高但泛化效果更好。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md"
+    ],
+    "decomposition": [
+      "微调在训练数据需求方面有什么特点？",
+      "蒸馏在训练数据需求方面有什么特点？"
+    ]
+  },
+  {
+    "question": "对比QLoRA的4-bit量化训练和传统全参数微调在显存需求和模型性能上的差异",
+    "answer": "QLoRA 4-bit训练显存需求降低约75%，可在消费级GPU上微调大模型，性能接近全参数微调；全参数微调显存需求高，需要多张高端GPU，但模型性能上限更高。QLoRA在效率和性能间取得了更好的平衡。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "QLoRA 4-bit训练的显存需求和性能如何？",
+      "全参数微调的显存需求和性能如何？"
+    ]
+  },
+  {
+    "question": "对比ReAct Agent处理幻觉问题和RAG系统处理幻觉问题的策略差异",
+    "answer": "ReAct Agent通过多轮工具调用交叉验证信息、在Observation中检查数据准确性来减少幻觉；RAG系统通过检索外部文档提供事实依据、用Faithfulness指标约束生成内容。ReAct侧重过程验证，RAG侧重来源约束。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "react_agent.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "ReAct Agent如何减少幻觉？",
+      "RAG系统如何减少幻觉？",
+      "两者减少幻觉的策略有什么本质差异？"
+    ]
+  },
+  {
+    "question": "对比QLoRA微调技术和模型蒸馏技术在适配小模型方面的效率和效果",
+    "answer": "QLoRA微调效率高，少量数据即可完成适配，但受限于基础模型能力；蒸馏效果可能更好，能将大模型能力迁移到小模型，但训练成本和时间远高于QLoRA。实践中可先用蒸馏获取基础能力，再用QLoRA做任务微调。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "qlora_intro.md",
+      "small_lm_trends.md"
+    ],
+    "decomposition": [
+      "QLoRA微调在适配小模型方面的效率和效果如何？",
+      "蒸馏技术在适配小模型方面的效率和效果如何？",
+      "两者如何结合使用？"
+    ]
+  },
+  {
+    "question": "对比FAISS向量检索和ReAct Function Calling在获取外部知识方面的适用场景",
+    "answer": "FAISS适合从大规模非结构化文档库中进行语义检索，适合知识库问答场景；Function Calling适合调用结构化API获取实时精确数据，如数据库查询、天气查询等。在Agentic RAG中两者常结合使用。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "rag_overview.md",
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "FAISS向量检索适合什么场景？",
+      "Function Calling适合什么场景？",
+      "两者如何在实际系统中结合？"
+    ]
+  },
+  {
+    "question": "对比用QLoRA训练ReAct Agent和用RAG增强ReAct Agent两种方案的优劣",
+    "answer": "QLoRA训练Agent可将工具使用能力内化到模型参数中，推理时无需额外检索开销，但需要高质量训练数据；RAG增强Agent通过外部文档提供上下文，无需训练但推理延迟受检索影响。两者可结合：用QLoRA训练Agent的推理能力，用RAG补充领域知识。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "qlora_intro.md",
+      "react_agent.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "用QLoRA训练ReAct Agent的方案优劣是什么？",
+      "用RAG增强ReAct Agent的方案优劣是什么？",
+      "两种方案如何互补？"
+    ]
+  },
+  {
+    "question": "对比RAG中的分块策略和ReAct中的多步推理策略在处理长文档时的不同思路",
+    "answer": "RAG的分块策略将长文档预先拆分为小块并建立索引，检索时返回最相关的片段；ReAct的多步推理让Agent逐步检索和整合信息，动态拼接长文档中的相关内容。RAG是预处理的静态方式，ReAct是交互式的动态方式。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "rag_overview.md",
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "RAG分块策略如何处理长文档？",
+      "ReAct多步推理如何处理长文档信息？",
+      "两种方式的核心思路差异是什么？"
+    ]
+  },
+  {
+    "question": "对比BGE嵌入模型和OpenAI嵌入模型在中文RAG系统中的表现差异",
+    "answer": "BGE针对中文优化，在中文语义检索中表现更好且可本地部署，数据隐私性更好；OpenAI嵌入模型在多语言通用性上更强但依赖API调用，有数据隐私和网络延迟的顾虑。中文RAG场景推荐优先使用BGE。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "BGE嵌入模型在中文场景下的优缺点是什么？",
+      "OpenAI嵌入模型在中文场景下的优缺点是什么？"
+    ]
+  },
+  {
+    "question": "对比QLoRA中的LoRA rank参数大小对模型性能的影响，以及与传统低秩分解方法的异同",
+    "answer": "较大的rank值提供更多可训练参数，提升模型性能但增加显存需求；较小的rank节省资源但可能无法充分学习任务知识。与传统低秩分解相比，LoRA冻结原始权重只训练低秩矩阵，而传统方法直接对权重矩阵做分解。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 2,
+    "source_docs": [
+      "qlora_intro.md"
+    ],
+    "decomposition": [
+      "不同rank值对LoRA模型性能有什么影响？",
+      "LoRA与传统低秩分解方法有什么区别？"
+    ]
+  },
+  {
+    "question": "对比ReAct Agent中的单步推理和多步推理在任务复杂度方面的适用范围",
+    "answer": "单步推理适合简单查询类任务，只需一次Thought-Action-Observation循环即可完成；多步推理适合需要信息整合、交叉验证的复杂任务，但推理延迟更高、token消耗更大。实际中应根据任务复杂度选择合适的推理深度。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "react_agent.md"
+    ],
+    "decomposition": [
+      "单步推理适合什么复杂度的任务？",
+      "多步推理适合什么复杂度的任务？"
+    ]
+  },
+  {
+    "question": "对比Qwen2.5系列不同规模模型（0.5B vs 7B）在RAG生成任务中的表现差异",
+    "answer": "0.5B模型推理快、部署成本低，适合简单生成任务和端侧部署，但在复杂推理和长文本生成中质量有限；7B模型生成质量更高、推理能力更强，适合复杂RAG场景但需要更多计算资源。选择时应根据任务复杂度和资源约束权衡。",
+    "type": "comparison",
+    "difficulty": "medium",
+    "hops": 2,
+    "source_docs": [
+      "small_lm_trends.md"
+    ],
+    "decomposition": [
+      "Qwen2.5-0.5B模型在RAG生成中的优缺点是什么？",
+      "Qwen2.5-7B模型在RAG生成中的优缺点是什么？"
+    ]
+  },
+  {
+    "question": "对比QLoRA微调和RAG检索增强两种方案在解决LLM领域知识不足问题上的思路",
+    "answer": "QLoRA微调将领域知识内化到模型参数中，推理时不依赖外部数据但需要训练数据；RAG通过外部文档检索动态补充知识，无需训练但依赖检索质量和文档库覆盖度。两者结合使用效果最佳。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "qlora_intro.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "QLoRA微调如何解决领域知识不足的问题？",
+      "RAG如何解决领域知识不足的问题？",
+      "两种方案的优劣势如何对比？"
+    ]
+  },
+  {
+    "question": "对比ReAct Agent的幻觉问题和RAG系统的Faithfulness问题，两者的本质差异是什么？",
+    "answer": "ReAct Agent的幻觉源于模型推理过程中生成不可靠的Thought或错误调用工具，是生成端的问题；RAG的Faithfulness问题指生成答案偏离检索到的上下文，是生成与检索的对齐问题。前者是模型内部推理错误，后者是检索结果未被忠实使用。",
+    "type": "comparison",
+    "difficulty": "hard",
+    "hops": 3,
+    "source_docs": [
+      "react_agent.md",
+      "rag_overview.md"
+    ],
+    "decomposition": [
+      "ReAct Agent幻觉问题的本质是什么？",
+      "RAG系统Faithfulness问题的本质是什么？",
+      "两者问题的根本差异在哪里？"
+    ]
+  }
+]
