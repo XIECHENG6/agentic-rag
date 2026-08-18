@@ -30,8 +30,16 @@ class VectorStore:
         """Add embeddings with associated texts and metadata."""
         if metadata is None:
             metadata = [{} for _ in range(len(texts))]
-        assert len(embeddings) == len(texts) == len(metadata)
-        self.index.add(embeddings.astype(np.float32))
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+        if embeddings.ndim != 2 or embeddings.shape[1] != self.dimension:
+            raise ValueError(
+                f"embeddings must have shape (n, {self.dimension}), got {embeddings.shape}"
+            )
+        if len(embeddings) != len(texts) or len(texts) != len(metadata):
+            raise ValueError("embeddings, texts, and metadata must have equal lengths")
+        if not texts:
+            return
+        self.index.add(embeddings)
         self.texts.extend(texts)
         self.metadata.extend(metadata)
 
@@ -157,3 +165,5 @@ class VectorStore:
         self.texts = data["texts"]
         self.metadata = data["metadata"]
         self.dimension = data.get("dimension", self.dimension)
+        if self.index.ntotal != len(self.texts) or len(self.texts) != len(self.metadata):
+            raise ValueError("Persisted vector index and metadata lengths do not match")

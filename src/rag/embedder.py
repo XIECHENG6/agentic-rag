@@ -70,3 +70,7 @@ class Embedder:
             prefix = self.query_prefix_zh if lang == "zh" else self.query_prefix_en
             query = prefix + query
         return self.encode([query])[0]
+
+    def token_count(self, text: str) -> int:
+        """Return the model tokenizer length without adding special tokens."""
+        return len(self.model.tokenizer.encode(text, add_special_tokens=False))

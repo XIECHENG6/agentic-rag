@@ -17,6 +17,8 @@
 
 一个轻量级 Agentic RAG 系统，整合了向量检索（FAISS）和知识图谱（NetworkX），通过 **8 状态有限状态机** 实现自适应检索和问题分解。Agent 自主判断检索结果是否充分，不够则自动 reformulate query 重新检索；复杂问题会被分解为子问题独立求解后综合。
 
+默认分块长度按 embedding 模型的 token 计数（`chunking.unit: tokens`），也可切换为字符计数；每次问答还受 `agent.max_llm_calls` 的硬调用预算限制。
+
 > **核心发现**：Agent 在简单问题上开销极小（+1-2 次 LLM 调用），但在多跳和对比类问题上显著优于 Simple RAG。
 
 ---
@@ -166,6 +168,25 @@ print(result["answer"])
 ### 评估指标
 
 ROUGE-L F1（字符级 LCS）、Exact Match、Token F1、Faithfulness、Answer Relevancy
+
+### 运行成本、来源召回与失败案例
+
+BenchmarkRunner 现在会为每道题记录：
+
+- LLM 调用次数、Prompt/Completion/Total tokens、请求耗时
+- 可配置单价后的估算美元成本
+- 基于 benchmark 的 `source_docs` 计算来源级召回率
+- `api_or_runtime_error`、`max_steps_exceeded`、`empty_answer`、`retrieval_miss`、`answer_mismatch` 失败类型
+
+在 Colab 中运行 Benchmark 前设置当前供应商的价格（单位：美元/百万 tokens）：
+
+```python
+import os
+os.environ["LLM_INPUT_COST_PER_1M"] = "your-input-price"
+os.environ["LLM_OUTPUT_COST_PER_1M"] = "your-output-price"
+```
+
+如果价格未设置，token 和调用次数仍会统计，但估算成本显示为 0；不要把 0 解释为真实免费。
 
 ---
 

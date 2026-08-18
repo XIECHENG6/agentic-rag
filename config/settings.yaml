@@ -3,6 +3,8 @@ llm:
   model: deepseek-chat
   temperature: 0.0
   max_tokens: 2048
+  timeout_seconds: 60
+  max_retries: 2
 
 embedding:
   model: BAAI/bge-small-zh-v1.5
@@ -12,6 +14,7 @@ embedding:
 
 chunking:
   strategy: recursive
+  unit: tokens
   chunk_size: 512
   chunk_overlap: 64
 
@@ -23,6 +26,7 @@ retrieval:
 
 agent:
   max_steps: 12
+  max_llm_calls: 24
   max_reformulations: 2
   reflection_threshold: 0.6
   max_sub_problems: 4

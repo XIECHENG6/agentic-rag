@@ -8,7 +8,7 @@ import time
 from typing import List, Dict, Optional
 
 from src.pipeline import AgenticRAGPipeline
-from src.evaluation.metrics import evaluate_single
+from src.evaluation.metrics import classify_failure, compute_source_recall, evaluate_single
 
 
 class BenchmarkRunner:
@@ -22,10 +22,18 @@ class BenchmarkRunner:
         runner.print_summary(results)
     """
 
-    def __init__(self, pipeline: AgenticRAGPipeline, verbose: bool = False):
+    def __init__(
+        self,
+        pipeline: AgenticRAGPipeline,
+        verbose: bool = False,
+        input_cost_per_1m: float = 0.0,
+        output_cost_per_1m: float = 0.0,
+    ):
         self.pipeline = pipeline
         self.benchmark: List[Dict] = []
         self.verbose = verbose
+        self.input_cost_per_1m = input_cost_per_1m
+        self.output_cost_per_1m = output_cost_per_1m
 
     def load_benchmark(self, path: str):
         """Load benchmark QA pairs from JSON.
@@ -62,6 +70,7 @@ class BenchmarkRunner:
             if verbose:
                 print(f"  [{i+1}/{len(questions)}] {q[:60]}...")
 
+            usage_before = self.pipeline.llm.snapshot_usage()
             start = time.time()
             try:
                 if system == "no_retrieval":
@@ -78,12 +87,19 @@ class BenchmarkRunner:
                 out = {"answer": "", "error": str(e)}
 
             elapsed = time.time() - start
+            usage = self.pipeline.llm.usage_delta(usage_before)
+            usage["estimated_cost_usd"] = (
+                usage["prompt_tokens"] * self.input_cost_per_1m / 1_000_000
+                + usage["completion_tokens"] * self.output_cost_per_1m / 1_000_000
+            )
 
             result = {
                 "answer": out.get("answer", ""),
                 "context": out.get("context", ""),
                 "time": round(elapsed, 2),
                 "error": out.get("error", None),
+                "status": out.get("status", "completed"),
+                "llm_usage": usage,
             }
             # Agent-specific fields
             if system == "agentic_rag":
@@ -126,6 +142,7 @@ class BenchmarkRunner:
         q_list = [q["question"] for q in qa_pairs]
         ref_list = [q["answer"] for q in qa_pairs]
         type_list = [q.get("type", "unknown") for q in qa_pairs]
+        source_list = [q.get("source_docs", []) for q in qa_pairs]
 
         all_results = {}
         for system in systems:
@@ -135,32 +152,64 @@ class BenchmarkRunner:
                 print(f"{'='*60}")
 
             results = self.run_system(system, q_list, verbose=verbose)
+            for index, result in enumerate(results):
+                result["source_recall"] = compute_source_recall(
+                    result.get("context", ""), source_list[index]
+                )
+                result["failure_type"] = classify_failure(
+                    result, source_list[index] if system != "no_retrieval" else [], ref_list[index]
+                )
 
-            # Separate successful results from errors
-            success_results = [r for r in results if not r.get("error")]
+            # Only completed runs belong in quality averages. A forced answer
+            # after max_steps is useful for failure analysis, but is not a
+            # successful Agent run.
+            success_results = [
+                r for r in results
+                if not r.get("error") and r.get("status") == "completed"
+            ]
             error_results = [r for r in results if r.get("error")]
+            incomplete_results = [
+                r for r in results
+                if not r.get("error") and r.get("status") != "completed"
+            ]
             error_count = len(error_results)
 
             # Compute overall metrics on successful results only
             from src.evaluation.metrics import evaluate_dataset
             if success_results:
-                success_indices = [i for i, r in enumerate(results) if not r.get("error")]
+                success_indices = [
+                    i for i, r in enumerate(results)
+                    if not r.get("error") and r.get("status") == "completed"
+                ]
                 predictions = [results[i]["answer"] for i in success_indices]
                 refs = [ref_list[i] for i in success_indices]
                 qs = [q_list[i] for i in success_indices]
                 ctxs = [results[i].get("context", "") for i in success_indices]
-                metrics = evaluate_dataset(predictions, refs, qs, ctxs)
+                expected = [source_list[i] for i in success_indices]
+                metrics = evaluate_dataset(predictions, refs, qs, ctxs, expected)
             else:
                 metrics = {"rouge_l": 0, "exact_match": 0, "f1": 0, "num_samples": 0}
             metrics["avg_time"] = sum(r["time"] for r in success_results) / max(len(success_results), 1)
             metrics["error_count"] = error_count
             metrics["error_rate"] = error_count / len(results) if results else 0
+            metrics["incomplete_count"] = len(incomplete_results)
+            usage_fields = ["calls", "errors", "prompt_tokens", "completion_tokens", "total_tokens", "latency_seconds", "estimated_cost_usd"]
+            for field in usage_fields:
+                metrics[f"llm_{field}"] = sum(
+                    result.get("llm_usage", {}).get(field, 0) for result in results
+                )
+            metrics["failure_count"] = sum(
+                1 for result in results if result.get("failure_type")
+            )
 
-            # Per-type metrics (also skip errors)
+            # Per-type metrics use the same completed-only population.
             per_type = {}
             for qtype in set(type_list):
                 type_indices = [
-                    i for i, t in enumerate(type_list) if t == qtype and not results[i].get("error")
+                    i for i, t in enumerate(type_list)
+                    if t == qtype
+                    and not results[i].get("error")
+                    and results[i].get("status") == "completed"
                 ]
                 if not type_indices:
                     continue
@@ -168,13 +217,19 @@ class BenchmarkRunner:
                 type_refs = [ref_list[i] for i in type_indices]
                 type_qs = [q_list[i] for i in type_indices]
                 type_ctxs = [results[i].get("context", "") for i in type_indices]
-                type_metrics = evaluate_dataset(type_preds, type_refs, type_qs, type_ctxs)
+                type_sources = [source_list[i] for i in type_indices]
+                type_metrics = evaluate_dataset(type_preds, type_refs, type_qs, type_ctxs, type_sources)
                 per_type[qtype] = type_metrics
 
             all_results[system] = {
                 "metrics": metrics,
                 "results": results,
                 "per_type_metrics": per_type,
+                "failure_cases": [
+                    {"index": i, "question": q_list[i], "reference": ref_list[i], **result}
+                    for i, result in enumerate(results)
+                    if result.get("failure_type")
+                ],
             }
 
         return all_results
@@ -182,38 +237,35 @@ class BenchmarkRunner:
     @staticmethod
     def print_summary(all_results: Dict[str, Dict]):
         """Print a comparison table of all systems."""
-        print(f"\n{'='*90}")
-        print(f"{'System':<16} {'ROUGE-L':>8} {'EM':>8} {'F1':>8} {'Faith':>8} {'Avg Time':>10} {'Errors':>8}")
-        print(f"{'-'*16} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*10} {'-'*8}")
+        print(f"\n{'='*100}")
+        print(f"{'System':<16} {'ROUGE-L':>8} {'F1':>8} {'Recall':>8} {'Calls':>8} {'Cost $':>10} {'Avg Time':>10} {'Failures':>9}")
+        print(f"{'-'*16} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*10} {'-'*10} {'-'*9}")
 
         for system, data in all_results.items():
-            m = data["metrics"]
-            err = m.get("error_count", 0)
-            faith = f"{m['faithfulness']:>8.3f}" if "faithfulness" in m else "     N/A"
+            metrics = data["metrics"]
             print(
                 f"{system:<16} "
-                f"{m.get('rouge_l', 0):>8.3f} "
-                f"{m.get('exact_match', 0):>8.1%} "
-                f"{m.get('f1', 0):>8.3f} "
-                f"{faith}"
-                f"{m.get('avg_time', 0):>10.1f}s"
-                f"{err:>8}"
+                f"{metrics.get('rouge_l', 0):>8.3f} "
+                f"{metrics.get('f1', 0):>8.3f} "
+                f"{metrics.get('source_recall', 0):>8.3f} "
+                f"{metrics.get('llm_calls', 0):>8.0f} "
+                f"{metrics.get('llm_estimated_cost_usd', 0):>10.4f} "
+                f"{metrics.get('avg_time', 0):>9.1f}s "
+                f"{metrics.get('failure_count', 0):>9}"
             )
 
-        # Per-type breakdown for agentic_rag
         if "agentic_rag" in all_results:
             print(f"\n{'='*80}")
             print("Agentic RAG per-type breakdown:")
-            print(f"{'Type':<16} {'ROUGE-L':>8} {'EM':>8} {'F1':>8} {'N':>5}")
+            print(f"{'Type':<16} {'ROUGE-L':>8} {'Recall':>8} {'F1':>8} {'N':>5}")
             print(f"{'-'*16} {'-'*8} {'-'*8} {'-'*8} {'-'*5}")
-
-            for qtype, m in all_results["agentic_rag"]["per_type_metrics"].items():
+            for qtype, metrics in all_results["agentic_rag"]["per_type_metrics"].items():
                 print(
                     f"{qtype:<16} "
-                    f"{m.get('rouge_l', 0):>8.3f} "
-                    f"{m.get('exact_match', 0):>8.1%} "
-                    f"{m.get('f1', 0):>8.3f} "
-                    f"{m.get('num_samples', 0):>5}"
+                    f"{metrics.get('rouge_l', 0):>8.3f} "
+                    f"{metrics.get('source_recall', 0):>8.3f} "
+                    f"{metrics.get('f1', 0):>8.3f} "
+                    f"{metrics.get('num_samples', 0):>5}"
                 )
 
     @staticmethod
@@ -224,9 +276,10 @@ class BenchmarkRunner:
             serializable[system] = {
                 "metrics": data["metrics"],
                 "per_type_metrics": data["per_type_metrics"],
+                "failure_cases": data.get("failure_cases", []),
                 "results": [
-                    {k: v for k, v in r.items() if k != "trace"}
-                    for r in data["results"]
+                    {key: value for key, value in result.items() if key != "trace"}
+                    for result in data["results"]
                 ],
             }
         with open(path, "w", encoding="utf-8") as f:

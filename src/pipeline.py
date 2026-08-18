@@ -11,6 +11,7 @@ Usage::
 """
 
 import os
+import json
 from typing import List, Optional
 
 from src.core.llm_client import LLMClient, load_config
@@ -50,6 +51,9 @@ class AgenticRAGPipeline:
         reflection_threshold: float = None,
         max_steps: int = None,
         verbose: bool = False,
+        allow_direct: bool = False,
+        chunk_unit: str = None,
+        max_llm_calls: int = None,
     ):
         config = load_config()
         agent_cfg = config.get("agent", {})
@@ -77,6 +81,9 @@ class AgenticRAGPipeline:
         self.chunk_size = chunk_size or chunk_cfg.get("chunk_size", 512)
         self.chunk_overlap = chunk_overlap if chunk_overlap is not None else chunk_cfg.get("chunk_overlap", 64)
         self.chunk_strategy = chunk_strategy or chunk_cfg.get("strategy", "recursive")
+        self.chunk_unit = chunk_unit or chunk_cfg.get("unit", "tokens")
+        if self.chunk_unit not in {"chars", "tokens"}:
+            raise ValueError("chunk_unit must be 'chars' or 'tokens'")
         self.all_chunks: List[Chunk] = []
 
         # Agent components
@@ -86,7 +93,8 @@ class AgenticRAGPipeline:
         )
         self.reflector = Reflector(
             self.llm,
-            threshold=reflection_threshold or agent_cfg.get("reflection_threshold", 0.6),
+            threshold=(reflection_threshold if reflection_threshold is not None
+                       else agent_cfg.get("reflection_threshold", 0.6)),
         )
         self.synthesizer = Synthesizer(self.llm)
 
@@ -111,7 +119,9 @@ class AgenticRAGPipeline:
             synthesizer=self.synthesizer,
             max_steps=max_steps or agent_cfg.get("max_steps", 12),
             max_reformulations=max_reformulations if max_reformulations is not None else agent_cfg.get("max_reformulations", 2),
+            max_llm_calls=max_llm_calls if max_llm_calls is not None else agent_cfg.get("max_llm_calls", 24),
             verbose=verbose,
+            allow_direct=allow_direct,
         )
 
         self.verbose = verbose
@@ -120,37 +130,51 @@ class AgenticRAGPipeline:
 
     def ingest_documents(self, documents: List[Document]):
         """Chunk, embed, index + extract KG triples from a list of Documents."""
+        if not documents:
+            return
+
         # Chunk
         chunks = chunk_documents(
             documents,
             strategy=self.chunk_strategy,
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
+            length_fn=self.embedder.token_count if self.chunk_unit == "tokens" else None,
         )
-        self.all_chunks.extend(chunks)
-
         if self.verbose:
             print(f"Chunked {len(documents)} documents → {len(chunks)} chunks")
+        if not chunks:
+            return
 
         # Embed + index
         texts = [c.text for c in chunks]
         embeddings = self.embedder.encode(texts, show_progress=self.verbose)
-        metas = [{"source": c.metadata.get("source", "unknown"), "chunk_id": c.chunk_id} for c in chunks]
-        self.vector_store.add(embeddings, texts, metas)
-
-        if self.verbose:
-            print(f"Vector store: {self.vector_store.size} vectors")
-
-        # KG extraction
+        metas = []
+        for chunk in chunks:
+            metadata = dict(chunk.metadata)
+            metadata.setdefault("source", "unknown")
+            metadata["chunk_id"] = chunk.chunk_id
+            metas.append(metadata)
+        # Extract all triples before mutating either index. This keeps a failed
+        # LLM extraction from leaving a partially ingested vector store.
+        pending_triples = []
         for doc in documents:
             text = doc.content
             triples = self.extractor.extract(text, max_triples=20)
-            added = self.kg.add_triples(triples)
+            source = doc.metadata.get("source", "unknown")
+            triples = [dict(triple, source=source) for triple in triples]
+            pending_triples.extend(triples)
             if self.verbose:
                 print(f"KG from '{doc.metadata.get('source', '?')}': "
-                      f"{len(triples)} extracted, {added} added")
+                      f"{len(triples)} extracted")
+
+        self.vector_store.add(embeddings, texts, metas)
+        self.all_chunks.extend(chunks)
+        added = self.kg.add_triples(pending_triples)
 
         if self.verbose:
+            print(f"Vector store: {self.vector_store.size} vectors")
+            print(f"KG triples added: {added}")
             stats = self.kg.stats()
             print(f"KG total: {stats['entities']} entities, {stats['relations']} relations")
 
@@ -209,6 +233,56 @@ class AgenticRAGPipeline:
         return {"answer": answer}
 
     # ---------- Stats ----------
+
+    def save(self, path: str):
+        """Persist the vector index, KG, and configuration as one artifact."""
+        os.makedirs(path, exist_ok=True)
+        vector_path = os.path.join(path, "vector_store")
+        kg_path = os.path.join(path, "knowledge_graph.json")
+        self.vector_store.save(vector_path)
+        self.kg.save(kg_path)
+        manifest = {
+            "schema_version": 1,
+            "embedding_model": self.embedder.model_name,
+            "embedding_dimension": self.embedder.dimension,
+            "chunk_size": self.chunk_size,
+            "chunk_overlap": self.chunk_overlap,
+            "chunk_strategy": self.chunk_strategy,
+            "chunk_unit": self.chunk_unit,
+            "vector_store": "vector_store",
+            "knowledge_graph": "knowledge_graph.json",
+        }
+        with open(os.path.join(path, "manifest.json"), "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+    @classmethod
+    def load(cls, path: str, **kwargs):
+        """Restore a pipeline artifact created by :meth:`save`."""
+        with open(os.path.join(path, "manifest.json"), "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+
+        init_kwargs = dict(kwargs)
+        init_kwargs.setdefault("embedding_model", manifest["embedding_model"])
+        init_kwargs.setdefault("chunk_size", manifest["chunk_size"])
+        init_kwargs.setdefault("chunk_overlap", manifest["chunk_overlap"])
+        init_kwargs.setdefault("chunk_strategy", manifest["chunk_strategy"])
+        init_kwargs.setdefault("chunk_unit", manifest.get("chunk_unit", "chars"))
+        pipeline = cls(**init_kwargs)
+        pipeline.vector_store.load(os.path.join(path, manifest["vector_store"]))
+        if pipeline.vector_store.dimension != pipeline.embedder.dimension:
+            raise ValueError(
+                "Persisted vector dimension does not match the embedding model: "
+                f"{pipeline.vector_store.dimension} != {pipeline.embedder.dimension}"
+            )
+        pipeline.kg.load(os.path.join(path, manifest["knowledge_graph"]))
+        pipeline.all_chunks = [
+            Chunk(text=text, metadata=dict(metadata),
+                  chunk_id=metadata.get("chunk_id", i))
+            for i, (text, metadata) in enumerate(
+                zip(pipeline.vector_store.texts, pipeline.vector_store.metadata)
+            )
+        ]
+        return pipeline
 
     def stats(self) -> dict:
         """Return pipeline statistics."""

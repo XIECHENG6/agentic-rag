@@ -62,16 +62,30 @@ class KnowledgeGraph:
                 s = t.get("subject", "")
                 r = t.get("relation", "")
                 o = t.get("object", "")
+                metadata = {
+                    key: value
+                    for key, value in t.items()
+                    if key not in {"subject", "relation", "object"}
+                }
             elif isinstance(t, (list, tuple)) and len(t) >= 3:
                 s, r, o = t[0], t[1], t[2]
+                metadata = {}
             else:
                 continue
             if s and r and o:
-                added += int(self.add_triple(s, r, o))
+                added += int(self.add_triple(s, r, o, **metadata))
         return added
 
     def has_entity(self, name):
         return self.graph.has_node(self._normalize(name))
+
+    def get_triple_metadata(self, subject, relation, obj):
+        """Return metadata stored on a normalized triple."""
+        s_norm = self._normalize(subject)
+        r_norm = relation.strip().lower()
+        o_norm = self._normalize(obj)
+        edge_data = self.graph.get_edge_data(s_norm, o_norm, default={})
+        return dict(edge_data.get(r_norm, {}))
 
     def get_entity_edges(self, entity):
         norm = self._normalize(entity)
@@ -155,10 +169,10 @@ class KnowledgeGraph:
 
     def merge(self, other):
         added = 0
-        for s, o, k in other.graph.edges(keys=True):
+        for s, o, k, edge_data in other.graph.edges(keys=True, data=True):
             s_disp = other._display(s)
             o_disp = other._display(o)
-            added += int(self.add_triple(s_disp, k, o_disp))
+            added += int(self.add_triple(s_disp, k, o_disp, **dict(edge_data)))
         return added
 
     def stats(self):
@@ -179,8 +193,13 @@ class KnowledgeGraph:
     def save(self, path):
         data = {
             "triples": [
-                {"subject": self._display(s), "relation": k, "object": self._display(o)}
-                for s, o, k in self.graph.edges(keys=True)
+                {
+                    "subject": self._display(s),
+                    "relation": k,
+                    "object": self._display(o),
+                    **dict(edge_data),
+                }
+                for s, o, k, edge_data in self.graph.edges(keys=True, data=True)
             ],
             "stats": self.stats(),
         }

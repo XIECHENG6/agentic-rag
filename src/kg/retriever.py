@@ -1,5 +1,6 @@
 """KG retriever — entity matching + BFS graph traversal + triple scoring."""
 
+import hashlib
 import re
 
 from .graph_store import KnowledgeGraph
@@ -35,10 +36,29 @@ class GraphRetriever:
         scored = self._score_triples(all_triples, query, entities)
         scored.sort(key=lambda x: x[1], reverse=True)
 
-        return [
-            {"triple": t, "score": s, "text": f"{t[0]} --[{t[1]}]--> {t[2]}"}
-            for t, s in scored[:max_results]
-        ]
+        results = []
+        for t, score in scored[:max_results]:
+            metadata = self.kg.get_triple_metadata(*t)
+            evidence_id = metadata.get("evidence_id")
+            if not evidence_id:
+                triple_key = "\x1f".join(part.lower() for part in t)
+                source = metadata.get("source")
+                prefix = f"{source}\x1f" if source else "kg\x1f"
+                evidence_id = "evidence:" + hashlib.sha1(
+                    (prefix + triple_key).encode("utf-8")
+                ).hexdigest()[:20]
+            results.append({
+                "triple": t,
+                "score": score,
+                "text": f"{t[0]} --[{t[1]}]--> {t[2]}",
+                "evidence_id": evidence_id,
+                "metadata": metadata,
+            })
+        return results
+
+    def find_entities(self, query):
+        """Resolve graph entities for a free-form user query."""
+        return self._find_query_entities(query)
 
     @staticmethod
     def _clean_query(query):
@@ -141,5 +161,6 @@ class GraphRetriever:
 
         lines = ["Knowledge Graph Context:"]
         for r in results:
-            lines.append(f"  - {r['text']}")
+            source = r.get("metadata", {}).get("source", "unknown")
+            lines.append(f"  - (source: {source}) {r['text']}")
         return "\n".join(lines)

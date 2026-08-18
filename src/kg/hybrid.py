@@ -1,5 +1,7 @@
 """Hybrid retrieval — RRF / weighted fusion of vector + KG results."""
 
+import hashlib
+
 from .graph_store import KnowledgeGraph
 from .retriever import GraphRetriever
 from ..rag.embedder import Embedder
@@ -46,80 +48,75 @@ class HybridRetriever:
         query_emb = self.embedder.encode_query(query, lang=lang)
         return self.vector_store.search(query_emb, top_k=top_k)
 
+    @staticmethod
+    def _evidence_id(result, backend):
+        metadata = result.get("metadata", {})
+        source = metadata.get("source")
+        chunk_id = metadata.get("chunk_id")
+        if source is not None and chunk_id is not None:
+            key = f"chunk\x1f{source}\x1f{chunk_id}"
+            return "evidence:" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:20]
+        evidence_id = result.get("evidence_id")
+        if evidence_id and not evidence_id.startswith(("kg:", "vector:", "graph:")):
+            return evidence_id
+        text_hash = hashlib.sha1(result.get("text", "").encode("utf-8")).hexdigest()[:16]
+        return "text:" + text_hash
+
+    @staticmethod
+    def _result_metadata(result):
+        return dict(result.get("metadata", {}))
+
+    def _format_fused(self, items, top_k):
+        ranked = sorted(items.items(), key=lambda item: item[1]["score"], reverse=True)
+        output = []
+        for evidence_id, item in ranked[:top_k]:
+            output.append({
+                "evidence_id": evidence_id,
+                "text": item["text"],
+                "score": item["score"],
+                "source": "+".join(sorted(item["sources"])),
+                "metadata": item["metadata"],
+            })
+        return output
+
     def _rrf_fusion(self, vector_results, graph_results, top_k):
-        scores = {}
-        sources = {}
-
-        for rank, r in enumerate(vector_results):
-            key = r["text"][:200]  # truncated key for better cross-source matching
-            scores[key] = scores.get(key, 0) + 1.0 / (self.rrf_k + rank + 1)
-            sources[key] = sources.get(key, set())
-            sources[key].add("vector")
-            if key not in self._text_cache:
-                self._text_cache[key] = r["text"]
-
-        for rank, r in enumerate(graph_results):
-            key = r["text"][:200]
-            scores[key] = scores.get(key, 0) + 1.0 / (self.rrf_k + rank + 1)
-            sources[key] = sources.get(key, set())
-            sources[key].add("graph")
-            if key not in self._text_cache:
-                self._text_cache[key] = r["text"]
-
-        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        return [
-            {
-                "text": self._text_cache[doc],
-                "score": score,
-                "source": "+".join(sorted(sources[doc])),
-            }
-            for doc, score in sorted_docs[:top_k]
-        ]
+        items = {}
+        for backend, results in (("vector", vector_results), ("graph", graph_results)):
+            for rank, result in enumerate(results):
+                evidence_id = self._evidence_id(result, backend)
+                item = items.setdefault(evidence_id, {
+                    "text": result.get("text", ""),
+                    "metadata": self._result_metadata(result),
+                    "sources": set(),
+                    "score": 0.0,
+                })
+                item["score"] += 1.0 / (self.rrf_k + rank + 1)
+                item["sources"].add(backend)
+        return self._format_fused(items, top_k)
 
     def _weighted_fusion(self, vector_results, graph_results, top_k):
-        scores = {}
-        sources = {}
-        text_map = {}
-
-        if vector_results:
-            raw_scores = [r["score"] for r in vector_results]
-            min_v = min(raw_scores)
-            # Shift to non-negative if needed, then normalize
-            shifted = [max(s - min(min_v, 0), 0) for s in raw_scores]
-            max_v = max(shifted) if shifted else 1.0
-            if max_v == 0:
-                max_v = 1.0
-            for r, s in zip(vector_results, shifted):
-                doc = r["text"]
-                text_map[doc] = doc
-                scores[doc] = self.vector_weight * (s / max_v)
-                sources[doc] = sources.get(doc, set())
-                sources[doc].add("vector")
-
-        if graph_results:
-            raw_scores = [r["score"] for r in graph_results]
-            min_g = min(raw_scores)
-            shifted = [max(s - min(min_g, 0), 0) for s in raw_scores]
-            max_g = max(shifted) if shifted else 1.0
-            if max_g == 0:
-                max_g = 1.0
-            for r, s in zip(graph_results, shifted):
-                doc = r["text"]
-                text_map[doc] = doc
-                existing = scores.get(doc, 0)
-                scores[doc] = existing + self.graph_weight * (s / max_g)
-                sources[doc] = sources.get(doc, set())
-                sources[doc].add("graph")
-
-        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        return [
-            {
-                "text": text_map[doc],
-                "score": score,
-                "source": "+".join(sorted(sources[doc])),
-            }
-            for doc, score in sorted_docs[:top_k]
-        ]
+        items = {}
+        for backend, results, weight in (
+            ("vector", vector_results, self.vector_weight),
+            ("graph", graph_results, self.graph_weight),
+        ):
+            if not results:
+                continue
+            raw_scores = [result.get("score", 0.0) for result in results]
+            min_score = min(raw_scores)
+            shifted = [max(score - min(min_score, 0), 0) for score in raw_scores]
+            max_score = max(shifted) or 1.0
+            for result, normalized_score in zip(results, shifted):
+                evidence_id = self._evidence_id(result, backend)
+                item = items.setdefault(evidence_id, {
+                    "text": result.get("text", ""),
+                    "metadata": self._result_metadata(result),
+                    "sources": set(),
+                    "score": 0.0,
+                })
+                item["score"] += weight * normalized_score / max_score
+                item["sources"].add(backend)
+        return self._format_fused(items, top_k)
 
     def get_context(self, query, top_k=5, graph_hops=2, lang="zh"):
         results = self.retrieve(query, top_k=top_k, graph_hops=graph_hops, lang=lang)
@@ -128,7 +125,8 @@ class HybridRetriever:
 
         lines = ["Retrieved Context:"]
         for i, r in enumerate(results, 1):
-            lines.append(f"  [{i}] (score: {r['score']:.4f}) {r['text']}")
+            source = r.get("metadata", {}).get("source", "unknown")
+            lines.append(f"  [{i}] (source: {source}, evidence_id: {r['evidence_id']}, score: {r['score']:.4f}) {r['text']}")
         return "\n".join(lines)
 
 

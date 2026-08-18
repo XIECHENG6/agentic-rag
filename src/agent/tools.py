@@ -105,6 +105,13 @@ class ToolExecutor:
         except Exception as e:
             return f"Error executing {tool_name}: {e}"
 
+    def has_retrieval_data(self):
+        """Return whether the pipeline has indexed vector or graph evidence."""
+        # ToolExecutor owns the Retriever rather than a separate VectorStore
+        # reference.  Keep this check in one place so the closed-domain guard
+        # does not fail before the first retrieval call.
+        return self.retriever.vector_store.size > 0 or self.kg.num_entities > 0
+
     # ---------- Retrieval tools ----------
 
     def _vector_search(self, query: str, top_k: int = 5, lang: str = "zh") -> str:
@@ -113,7 +120,8 @@ class ToolExecutor:
             return "No relevant passages found via vector search."
         lines = ["Vector search results:"]
         for i, r in enumerate(results, 1):
-            lines.append(f"  [{i}] (score: {r['score']:.3f}) {r['text']}")
+            source = r.get("metadata", {}).get("source", "unknown")
+            lines.append(f"  [{i}] (source: {source}, score: {r['score']:.3f}) {r['text']}")
         return "\n".join(lines)
 
     def _kg_query(self, entity: str, hops: int = 2) -> str:
@@ -123,7 +131,7 @@ class ToolExecutor:
                 suggestions = ", ".join(f"'{m[0]}'" for m in matches[:5])
                 return f"Entity '{entity}' not found. Did you mean: {suggestions}?"
             return f"Entity '{entity}' not found in knowledge graph."
-        return self.kg.get_subgraph_text(entity, hops=hops)
+        return self.graph_retriever.get_context(entity, hops=hops, max_results=10)
 
     def _kg_search(self, keyword: str) -> str:
         matches = self.kg.search_entities(keyword)
@@ -141,7 +149,9 @@ class ToolExecutor:
             return "No relevant context found via hybrid search."
         lines = ["Hybrid search results:"]
         for i, r in enumerate(results, 1):
-            lines.append(f"  [{i}] (score: {r['score']:.4f}) {r['text']}")
+            source = r.get("metadata", {}).get("source", "unknown")
+            evidence_id = r.get("evidence_id", "unknown")
+            lines.append(f"  [{i}] (source: {source}, evidence_id: {evidence_id}, score: {r['score']:.4f}) {r['text']}")
         return "\n".join(lines)
 
     # ---------- Reasoning tools ----------
@@ -221,6 +231,21 @@ class ToolExecutor:
         Maps the generic (query, top_k) call to each tool's specific signature.
         Used by the state machine's RETRIEVING state.
         """
+        if tool_name == "kg_query":
+            entities = self.graph_retriever.find_entities(query)
+            if not entities:
+                return self.execute(tool_name, {"entity": query, "hops": 2})
+            contexts = [
+                self.execute(tool_name, {"entity": entity, "hops": 2})
+                for entity in entities[:3]
+            ]
+            return "\n\n---\n\n".join(contexts)
+
+        if tool_name == "kg_search":
+            entities = self.graph_retriever.find_entities(query)
+            keyword = entities[0] if entities else query
+            return self.execute(tool_name, {"keyword": keyword})
+
         spec = self._RETRIEVAL_PARAM_MAP.get(tool_name)
         if spec is None:
             # Fallback: pass query/top_k as-is

@@ -147,6 +147,31 @@ def compute_step_efficiency(trace: List[Dict]) -> int:
     return len(trace)
 
 
+def compute_source_recall(context: str, expected_sources: List[str]) -> float:
+    """Compute source-level recall from source markers in retrieved context."""
+    if not expected_sources:
+        return 0.0
+    context_lower = (context or "").lower()
+    hits = sum(1 for source in expected_sources if source.lower() in context_lower)
+    return hits / len(expected_sources)
+
+
+def classify_failure(result: Dict, expected_sources: List[str] = None, reference: str = "") -> Optional[str]:
+    """Return a stable failure category for benchmark case analysis."""
+    if result.get("error"):
+        return "api_or_runtime_error"
+    if result.get("status") in {"max_steps_exceeded", "llm_budget_exceeded"}:
+        return result["status"]
+    answer = (result.get("answer") or "").strip()
+    if not answer:
+        return "empty_answer"
+    if expected_sources and compute_source_recall(result.get("context", ""), expected_sources) == 0:
+        return "retrieval_miss"
+    if reference and compute_rouge_l(answer, reference) < 0.2:
+        return "answer_mismatch"
+    return None
+
+
 # ============================================================
 # Aggregate evaluation
 # ============================================================
@@ -178,23 +203,30 @@ def evaluate_dataset(
     references: List[str],
     questions: List[str] = None,
     contexts: List[str] = None,
+    expected_sources: List[List[str]] = None,
 ) -> Dict[str, float]:
     """Aggregate metrics across a dataset.
 
     Returns dict of averaged metrics.
     """
     n = len(predictions)
-    assert n == len(references)
+    if n == 0:
+        return {"rouge_l": 0.0, "exact_match": 0.0, "f1": 0.0, "num_samples": 0}
+    if n != len(references):
+        raise ValueError("predictions and references must have equal length")
     if questions is not None:
         assert len(questions) >= n, f"questions ({len(questions)}) shorter than predictions ({n})"
-    if contexts is not None:
-        assert len(contexts) >= n, f"contexts ({len(contexts)}) shorter than predictions ({n})"
+    if contexts is not None and len(contexts) < n:
+        raise ValueError(f"contexts ({len(contexts)}) shorter than predictions ({n})")
+    if expected_sources is not None and len(expected_sources) < n:
+        raise ValueError(f"expected_sources ({len(expected_sources)}) shorter than predictions ({n})")
 
     rouge_scores = []
     em_scores = []
     f1_scores = []
     faith_scores = []
     relevancy_scores = []
+    source_recall_scores = []
 
     for i in range(n):
         q = questions[i] if questions else ""
@@ -208,6 +240,8 @@ def evaluate_dataset(
             faith_scores.append(m["faithfulness"])
         if "answer_relevancy" in m:
             relevancy_scores.append(m["answer_relevancy"])
+        if expected_sources is not None:
+            source_recall_scores.append(compute_source_recall(ctx, expected_sources[i]))
 
     result = {
         "rouge_l": sum(rouge_scores) / n,
@@ -219,5 +253,7 @@ def evaluate_dataset(
         result["faithfulness"] = sum(faith_scores) / len(faith_scores)
     if relevancy_scores:
         result["answer_relevancy"] = sum(relevancy_scores) / len(relevancy_scores)
+    if source_recall_scores:
+        result["source_recall"] = sum(source_recall_scores) / len(source_recall_scores)
 
     return result

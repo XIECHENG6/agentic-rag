@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
 from src.core.llm_client import LLMClient
+from src.core.llm_client import LLMCallBudgetExceeded
 from src.agent.planner import Planner
 from src.agent.reflector import Reflector
 from src.agent.synthesizer import Synthesizer
@@ -34,6 +35,7 @@ class AgentContext:
     sub_answers: List[str] = field(default_factory=list)
     current_sub_index: int = 0
     retrieved_contexts: List[str] = field(default_factory=list)
+    sub_contexts: List[str] = field(default_factory=list)
     reflection_scores: Dict[str, float] = field(default_factory=dict)
     reformulation_count: int = 0
     max_reformulations: int = 2
@@ -45,7 +47,7 @@ class AgentContext:
 
 TRANSITIONS = {
     "INIT":          {"next": "PLANNING"},
-    "PLANNING":      {"simple": "RETRIEVING", "decompose": "SOLVING_SUB", "direct": "GENERATING"},
+    "PLANNING":      {"retrieve": "RETRIEVING", "decompose": "SOLVING_SUB", "direct": "GENERATING"},
     "RETRIEVING":    {"next": "REFLECTING"},
     "REFLECTING":    {"sufficient": "GENERATING", "reformulate": "REFORMULATING", "give_up": "GENERATING"},
     "REFORMULATING": {"next": "RETRIEVING"},
@@ -78,6 +80,8 @@ class AgenticRAG:
         max_steps: int = 12,
         max_reformulations: int = 2,
         verbose: bool = False,
+        allow_direct: bool = False,
+        max_llm_calls: int = 24,
     ):
         self.llm = llm
         self.tools = tools
@@ -86,7 +90,9 @@ class AgenticRAG:
         self.synthesizer = synthesizer
         self.max_steps = max_steps
         self.max_reformulations = max_reformulations
+        self.max_llm_calls = max_llm_calls
         self.verbose = verbose
+        self.allow_direct = allow_direct
 
     def run(self, question: str, verbose: bool = None, lang: str = "zh") -> dict:
         """Run the agent on a question.
@@ -100,7 +106,7 @@ class AgenticRAG:
                 "sub_problems": list[str],
                 "reformulations": int,
                 "reflection_scores": dict,
-                "status": "completed"|"max_steps_exceeded",
+                "status": "completed"|"max_steps_exceeded"|"llm_budget_exceeded",
             }
         """
         verbose = verbose if verbose is not None else self.verbose
@@ -124,29 +130,44 @@ class AgenticRAG:
             "GENERATING":    self._handle_generating,
         }
 
-        for step in range(self.max_steps):
-            handler = handlers.get(state)
-            if handler is None:
-                break
+        usage_before = self.llm.snapshot_usage()
+        self.llm.set_call_budget(usage_before["calls"] + self.max_llm_calls)
+        try:
+            for step in range(self.max_steps):
+                handler = handlers.get(state)
+                if handler is None:
+                    break
 
+                if verbose:
+                    print(f"\n{'='*50}")
+                    print(f"[Step {step+1}] State: {state}")
+                    print(f"{'='*50}")
+
+                next_state = handler(ctx, verbose)
+                state = next_state
+
+                if state == "GENERATING":
+                    # Run the generating handler one last time
+                    self._handle_generating(ctx, verbose)
+                    break
+            else:
+                # max_steps exhausted without reaching GENERATING
+                status = "max_steps_exceeded"
+                if not ctx.final_answer:
+                    # Force a final answer from whatever context we have
+                    self._handle_generating(ctx, verbose)
+        except LLMCallBudgetExceeded:
+            status = "llm_budget_exceeded"
             if verbose:
-                print(f"\n{'='*50}")
-                print(f"[Step {step+1}] State: {state}")
-                print(f"{'='*50}")
+                print(f"  LLM call budget exhausted ({self.max_llm_calls})")
+        finally:
+            self.llm.clear_call_budget()
 
-            next_state = handler(ctx, verbose)
-            state = next_state
-
-            if state == "GENERATING":
-                # Run the generating handler one last time
-                self._handle_generating(ctx, verbose)
-                break
-        else:
-            # max_steps exhausted without reaching GENERATING
-            status = "max_steps_exceeded"
-            if not ctx.final_answer:
-                # Force a final answer from whatever context we have
-                self._handle_generating(ctx, verbose)
+        output_context = (
+            "\n\n---\n\n".join(ctx.sub_contexts)
+            if ctx.sub_contexts
+            else (ctx.retrieved_contexts[-1] if ctx.retrieved_contexts else "")
+        )
 
         return {
             "answer": ctx.final_answer,
@@ -157,7 +178,7 @@ class AgenticRAG:
             "reformulations": ctx.reformulation_count,
             "reflection_scores": ctx.reflection_scores,
             "status": status,
-            "context": "\n\n---\n\n".join(ctx.retrieved_contexts) if ctx.retrieved_contexts else "",
+            "context": output_context,
         }
 
     # ---------- State handlers ----------
@@ -168,6 +189,17 @@ class AgenticRAG:
         ctx.strategy = plan["strategy"]
         ctx.suggested_tool = plan["suggested_tool"]
         ctx.sub_problems = plan["sub_problems"]
+
+        if (
+            ctx.strategy == "direct"
+            and not self.allow_direct
+            and self.tools.has_retrieval_data()
+        ):
+            ctx.strategy = "retrieve"
+            ctx.suggested_tool = "hybrid_search"
+            ctx.sub_problems = []
+            plan = {**plan, "strategy": "retrieve", "suggested_tool": "hybrid_search",
+                    "reasoning": "Closed-domain guard forced retrieval because the knowledge base is non-empty."}
 
         self._log(ctx, "PLANNING", plan)
 
@@ -277,6 +309,10 @@ class AgenticRAG:
             new_q = self.reflector.reformulate(sub_q, sub_q, result, "expand")
             result = self.tools.get_retrieval_result_text("hybrid_search", new_q, top_k=5, lang=ctx.lang)
 
+        # Keep the final context for provenance and benchmark source recall.
+        # Intermediate failed attempts are intentionally not exposed.
+        ctx.sub_contexts.append(result)
+
         # Generate sub-answer
         sub_answer = self.synthesizer.generate_answer(sub_q, result)
         ctx.sub_answers.append(sub_answer)
@@ -320,9 +356,9 @@ class AgenticRAG:
             # Already have an answer from synthesis
             answer = ctx.final_answer
         else:
-            # Combine all retrieved contexts
-            all_context = "\n\n---\n\n".join(ctx.retrieved_contexts)
-            answer = self.synthesizer.generate_answer(ctx.question, all_context)
+            # Use the latest judged context instead of mixing failed attempts
+            latest_context = ctx.retrieved_contexts[-1] if ctx.retrieved_contexts else ""
+            answer = self.synthesizer.generate_answer(ctx.question, latest_context)
 
         ctx.final_answer = answer
 
