@@ -8,7 +8,7 @@ import time
 from typing import List, Dict, Optional
 
 from src.pipeline import AgenticRAGPipeline
-from src.evaluation.metrics import classify_failure, compute_source_recall, evaluate_single
+from src.evaluation.metrics import classify_failure, compute_source_recall, evaluate_single, compute_llm_judge
 
 
 class BenchmarkRunner:
@@ -28,12 +28,14 @@ class BenchmarkRunner:
         verbose: bool = False,
         input_cost_per_1m: float = 0.0,
         output_cost_per_1m: float = 0.0,
+        use_llm_judge: bool = True,
     ):
         self.pipeline = pipeline
         self.benchmark: List[Dict] = []
         self.verbose = verbose
         self.input_cost_per_1m = input_cost_per_1m
         self.output_cost_per_1m = output_cost_per_1m
+        self.use_llm_judge = use_llm_judge
 
     def load_benchmark(self, path: str):
         """Load benchmark QA pairs from JSON.
@@ -221,6 +223,43 @@ class BenchmarkRunner:
                 type_metrics = evaluate_dataset(type_preds, type_refs, type_qs, type_ctxs, type_sources)
                 per_type[qtype] = type_metrics
 
+            # LLM-as-Judge: semantic quality scoring (one extra API call per question)
+            if self.use_llm_judge:
+                judge_scores = []
+                for idx in success_indices:
+                    score = compute_llm_judge(
+                        self.pipeline.llm,
+                        q_list[idx],
+                        ref_list[idx],
+                        results[idx]["answer"],
+                    )
+                    results[idx]["llm_judge"] = score
+                    if score is not None:
+                        judge_scores.append(score)
+                    if self.verbose and score is not None:
+                        print(f"    [Judge] Q{idx+1}: {score:.2f}")
+                if judge_scores:
+                    metrics["llm_judge"] = sum(judge_scores) / len(judge_scores)
+
+                # Per-type LLM judge scores
+                for qtype in per_type:
+                    type_indices = [
+                        i for i, t in enumerate(type_list)
+                        if t == qtype
+                        and not results[i].get("error")
+                        and results[i].get("status") == "completed"
+                    ]
+                    type_judge = [
+                        results[i]["llm_judge"]
+                        for i in type_indices
+                        if results[i].get("llm_judge") is not None
+                    ]
+                    if type_judge:
+                        per_type[qtype]["llm_judge"] = sum(type_judge) / len(type_judge)
+            else:
+                for idx in success_indices:
+                    results[idx]["llm_judge"] = None
+
             all_results[system] = {
                 "metrics": metrics,
                 "results": results,
@@ -237,15 +276,17 @@ class BenchmarkRunner:
     @staticmethod
     def print_summary(all_results: Dict[str, Dict]):
         """Print a comparison table of all systems."""
-        print(f"\n{'='*100}")
-        print(f"{'System':<16} {'ROUGE-L':>8} {'F1':>8} {'Recall':>8} {'Calls':>8} {'Cost $':>10} {'Avg Time':>10} {'Failures':>9}")
-        print(f"{'-'*16} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*10} {'-'*10} {'-'*9}")
+        print(f"\n{'='*110}")
+        print(f"{'System':<16} {'ROUGE-L':>8} {'Judge':>8} {'F1':>8} {'Recall':>8} {'Calls':>8} {'Cost $':>10} {'Avg Time':>10} {'Failures':>9}")
+        print(f"{'-'*16} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*10} {'-'*10} {'-'*9}")
 
         for system, data in all_results.items():
             metrics = data["metrics"]
+            judge_str = f"{metrics.get('llm_judge', 0):>8.3f}" if 'llm_judge' in metrics else f"{'N/A':>8}"
             print(
                 f"{system:<16} "
                 f"{metrics.get('rouge_l', 0):>8.3f} "
+                f"{judge_str} "
                 f"{metrics.get('f1', 0):>8.3f} "
                 f"{metrics.get('source_recall', 0):>8.3f} "
                 f"{metrics.get('llm_calls', 0):>8.0f} "
@@ -255,14 +296,16 @@ class BenchmarkRunner:
             )
 
         if "agentic_rag" in all_results:
-            print(f"\n{'='*80}")
+            print(f"\n{'='*90}")
             print("Agentic RAG per-type breakdown:")
-            print(f"{'Type':<16} {'ROUGE-L':>8} {'Recall':>8} {'F1':>8} {'N':>5}")
-            print(f"{'-'*16} {'-'*8} {'-'*8} {'-'*8} {'-'*5}")
+            print(f"{'Type':<16} {'ROUGE-L':>8} {'Judge':>8} {'Recall':>8} {'F1':>8} {'N':>5}")
+            print(f"{'-'*16} {'-'*8} {'-'*8} {'-'*8} {'-'*8} {'-'*5}")
             for qtype, metrics in all_results["agentic_rag"]["per_type_metrics"].items():
+                judge_str = f"{metrics.get('llm_judge', 0):>8.3f}" if 'llm_judge' in metrics else f"{'N/A':>8}"
                 print(
                     f"{qtype:<16} "
                     f"{metrics.get('rouge_l', 0):>8.3f} "
+                    f"{judge_str} "
                     f"{metrics.get('source_recall', 0):>8.3f} "
                     f"{metrics.get('f1', 0):>8.3f} "
                     f"{metrics.get('num_samples', 0):>5}"

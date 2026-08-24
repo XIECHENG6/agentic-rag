@@ -23,9 +23,13 @@ from typing import List, Dict, Optional
 # ============================================================
 
 def compute_rouge_l(prediction: str, reference: str) -> float:
-    """ROUGE-L F1 — character-level LCS, designed for Chinese text."""
-    pred_chars = list(prediction)
-    ref_chars = list(reference)
+    """ROUGE-L F1 — character-level LCS, designed for Chinese text.
+
+    Inputs are normalized (punctuation/whitespace stripped) before comparison
+    so that surface-form differences don't penalize semantically correct answers.
+    """
+    pred_chars = list(normalize_answer(prediction))
+    ref_chars = list(normalize_answer(reference))
     if not pred_chars or not ref_chars:
         return 0.0
 
@@ -114,6 +118,66 @@ def compute_answer_relevancy(answer: str, question: str) -> float:
         return 0.0
     overlap = sum((q_ngrams & a_ngrams).values())
     return overlap / sum(q_ngrams.values())
+
+
+# ============================================================
+# LLM-as-Judge semantic evaluation
+# ============================================================
+
+_JUDGE_PROMPT = """\
+你是一个严格的答案质量评审员。请根据以下标准对「待评答案」打分（1-5分）：
+
+- 5分：答案完全正确，涵盖了参考答案的所有关键信息，无事实错误
+- 4分：答案基本正确，涵盖了大部分关键信息，可能有轻微遗漏
+- 3分：答案部分正确，涵盖了部分关键信息，但有明显遗漏或小的事实错误
+- 2分：答案有较多错误或遗漏，只涵盖少量关键信息
+- 1分：答案基本错误或与问题无关
+
+## 问题
+{question}
+
+## 参考答案
+{reference}
+
+## 待评答案
+{answer}
+
+请只输出一个整数（1-5），不要输出其他内容。"""
+
+
+def compute_llm_judge(
+    llm_client,
+    question: str,
+    reference: str,
+    answer: str,
+) -> Optional[float]:
+    """LLM-as-Judge: 用 LLM 语义评估答案质量，返回 0-1 分数。
+
+    Args:
+        llm_client: LLMClient instance (pipeline.llm).
+        question: 原始问题。
+        reference: 参考答案。
+        answer: 待评答案。
+
+    Returns:
+        0.0-1.0 的分数，解析失败时返回 None。
+    """
+    prompt = _JUDGE_PROMPT.format(
+        question=question, reference=reference, answer=answer
+    )
+    try:
+        reply = llm_client.generate(
+            [{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=8,
+        )
+        # 从回复中提取第一个整数
+        match = re.search(r"[1-5]", reply.strip())
+        if match:
+            return (int(match.group()) - 1) / 4  # 1→0.0, 5→1.0
+    except Exception:
+        pass
+    return None
 
 
 # ============================================================
