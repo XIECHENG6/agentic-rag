@@ -43,7 +43,7 @@ class LLMClient:
             max_retries=max_retries,
         )
         self.model = model or os.getenv(
-            "LLM_MODEL", config.get("model", "deepseek-chat")
+            "LLM_MODEL", config.get("model", "deepseek-v4-flash")
         )
         self.temperature = config.get("temperature", 0.0)
         self.max_tokens = config.get("max_tokens", 2048)

@@ -19,7 +19,7 @@
 
 默认分块长度按 embedding 模型的 token 计数（`chunking.unit: tokens`），也可切换为字符计数；每次问答还受 `agent.max_llm_calls` 的硬调用预算限制。
 
-> **核心发现**：Agent 在简单问题上开销极小（+1-2 次 LLM 调用），但在多跳和对比类问题上显著优于 Simple RAG。
+> **核心发现（80 题 benchmark）**：在模型参数化知识答不准的 hard 题上，Agentic RAG 的语义评分（LLM-as-Judge）降幅仅 0.020，而纯 LLM 降 0.091；Source Recall 0.988、Answer Relevancy 0.715，均为四个对比系统最高。完整数据见 `results/`。
 
 ---
 
@@ -81,7 +81,7 @@ agentic-rag/
 │   └── settings.yaml              # DeepSeek API + 模型 + Agent 参数
 ├── data/
 │   ├── documents.py               # 4 篇中文技术文档（知识库）
-│   └── benchmark.json             # 60 道 QA 评测集 (20 simple + 20 bridge + 20 comparison)
+│   └── benchmark.json             # 80 道 QA 评测集 (27 simple + 27 bridge + 26 comparison；easy 8 / medium 34 / hard 38)
 ├── src/
 │   ├── core/
 │   │   └── llm_client.py          # DeepSeek API + 4层 fallback JSON 解析器
@@ -109,7 +109,7 @@ agentic-rag/
 │   └── pipeline.py                # AgenticRAGPipeline — 单入口编排器
 ├── notebooks/
 │   ├── 01_Setup_and_Quick_Start   # 环境搭建 + 数据注入 + Quick Demo
-│   └── 02_Agent_vs_Simple_RAG     # 60 题 Benchmark + 图表 + Case Study
+│   └── 02_Agent_vs_Simple_RAG     # 80 题 Benchmark + 图表 + Case Study
 ├── demo/
 │   └── app.py                     # Gradio 三系统对比 Demo
 └── requirements.txt
@@ -148,13 +148,15 @@ print(result["answer"])
 
 ### Benchmark 数据集
 
-60 道中文 QA，覆盖 4 个技术领域（QLoRA / ReAct / RAG / 小模型），分三类：
+80 道中文 QA，覆盖 4 个技术领域（QLoRA / ReAct / RAG / 小模型）：
 
-| 类型 | 数量 | 描述 | 预期 Agent 优势 |
-|------|------|------|----------------|
-| Simple | 20 | 单事实查询 | ≈ Simple RAG（开销小） |
-| Bridge | 20 | 多跳推理（2-3 跳） | >> Simple RAG（+20-30pp） |
-| Comparison | 20 | 概念对比 | >> Simple RAG（+20-35pp） |
+| 题型 | 数量 | 描述 |
+|------|------|------|
+| Simple | 27 | 单事实查询 |
+| Bridge | 27 | 多跳推理（2-3 跳） |
+| Comparison | 26 | 概念对比 |
+
+难度标注为 easy 8 / medium 34 / hard 38。其中 20 道新增题全为 hard，聚焦精确数字（如具体评测得分）与跨文档推理——模型参数化知识答不准的区间，用于检验检索系统的真实价值。
 
 ### 对比系统
 
@@ -167,7 +169,7 @@ print(result["answer"])
 
 ### 评估指标
 
-ROUGE-L F1（字符级 LCS）、Exact Match、Token F1、Faithfulness、Answer Relevancy
+ROUGE-L F1（字符级 LCS，输入已归一化）、Exact Match、Token F1、Faithfulness、Answer Relevancy、Source Recall、LLM-as-Judge（1-5 分映射到 [0,1]）
 
 ### 运行成本、来源召回与失败案例
 

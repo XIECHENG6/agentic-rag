@@ -149,7 +149,7 @@ n01_cells = [
     md(
         "## 完成！下一步\n"
         "\n"
-        "- [02_Agent_vs_Simple_RAG.ipynb](02_Agent_vs_Simple_RAG.ipynb) — 完整基准测试（60题 × 4系统）\n"
+        "- [02_Agent_vs_Simple_RAG.ipynb](02_Agent_vs_Simple_RAG.ipynb) — 完整基准测试（80题 × 4系统）\n"
         "- [demo/app.py](../demo/app.py) — 交互式 Gradio 界面对比三种 RAG 系统\n"
     ),
 ]
@@ -199,7 +199,7 @@ n02_cells = [
     md(
         "# Agentic RAG — Agent vs Simple RAG Benchmark\n"
         "\n"
-        "本 Notebook 对比四种 RAG 系统在 60 道基准题上的表现：\n"
+        "本 Notebook 对比四种 RAG 系统在 80 道基准题上的表现：\n"
         "- **No Retrieval** — 纯 LLM，无检索增强\n"
         "- **Simple RAG** — Top-K 向量检索 + LLM\n"
         "- **Hybrid RAG** — 向量检索 + 知识图谱子图增强\n"
