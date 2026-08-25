@@ -29,3 +29,7 @@ Thumbs.db
 
 # Model cache
 model_cache/
+
+# Regeneratable / local-only artifacts
+results/figures/knowledge_graph.png
+results/agentic_rag_results*.json
